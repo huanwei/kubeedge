@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"github.com/kubeedge/kubeedge/edge/pkg/edgedlight"
 	"os"
 
 	"github.com/kubeedge/kubeedge/edge/pkg/edgestream"
@@ -18,7 +19,6 @@ import (
 	"github.com/kubeedge/kubeedge/edge/cmd/edgecore/app/options"
 	"github.com/kubeedge/kubeedge/edge/pkg/common/dbm"
 	"github.com/kubeedge/kubeedge/edge/pkg/devicetwin"
-	"github.com/kubeedge/kubeedge/edge/pkg/edged"
 	"github.com/kubeedge/kubeedge/edge/pkg/edgehub"
 	"github.com/kubeedge/kubeedge/edge/pkg/eventbus"
 	"github.com/kubeedge/kubeedge/edge/pkg/metamanager"
@@ -147,8 +147,9 @@ func environmentCheck() error {
 
 // registerModules register all the modules started in edgecore
 func registerModules(c *v1alpha1.EdgeCoreConfig) {
+	edgedlight.Register(c.Modules.EdgedLight)
 	devicetwin.Register(c.Modules.DeviceTwin, c.Modules.Edged.HostnameOverride)
-	edged.Register(c.Modules.Edged)
+	//edged.Register(c.Modules.Edged)
 	edgehub.Register(c.Modules.EdgeHub, c.Modules.Edged.HostnameOverride)
 	eventbus.Register(c.Modules.EventBus, c.Modules.Edged.HostnameOverride)
 	edgemesh.Register(c.Modules.EdgeMesh)

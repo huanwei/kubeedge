@@ -80,6 +80,8 @@ type DataBase struct {
 
 // Modules indicates the modules which edgeCore will be used
 type Modules struct {
+	// EdgedLight用于对接podman
+	EdgedLight *EdgedLight `json:"edgedLight,omitempty"`
 	// Edged indicates edged module config
 	// +Required
 	Edged *Edged `json:"edged,omitempty"`
@@ -104,6 +106,36 @@ type Modules struct {
 	// EdgeStream indicates edgestream module config
 	// +Required
 	EdgeStream *EdgeStream `json:"edgeStream,omitempty"`
+}
+
+type EdgedLight struct {
+	// Enable indicates whether edged is enabled,
+	// if set to false (for debugging etc.), skip checking other edged configs.
+	// default true
+	Enable bool `json:"enable,omitempty"`
+	// NodeStatusUpdateFrequency indicates node status update frequency (second)
+	// default 10
+	NodeStatusUpdateFrequency int32 `json:"nodeStatusUpdateFrequency,omitempty"`
+	// HostnameOverride indicates hostname
+	// default os.Hostname()
+	HostnameOverride string `json:"hostnameOverride,omitempty"`
+	//RegisterNodeNamespace indicates register node namespace
+	// default "default"
+	RegisterNodeNamespace string `json:"registerNodeNamespace,omitempty"`
+	// ConcurrentConsumers indicates concurrent consumers for pod add or remove operation
+	// default 5
+	ConcurrentConsumers int `json:"concurrentConsumers,omitempty"`
+	// CgroupsPerQOS enables QoS based Cgroup hierarchy: top level cgroups for QoS Classes
+	// And all Burstable and BestEffort pods are brought up under their
+	// specific top level QoS cgroup.
+	// Default: true
+	CgroupsPerQOS bool `json:"cgroupsPerQOS"`
+	// RegisterNode enables automatic registration
+	// default true
+	RegisterNode bool `json:"registerNode,omitempty"`
+	// NodeIP indicates current node ip
+	// default get local host ip
+	NodeIP string `json:"nodeIP"`
 }
 
 // Edged indicates the config fo edged module
