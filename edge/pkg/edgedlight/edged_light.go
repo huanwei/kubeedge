@@ -34,7 +34,6 @@ import (
 	"k8s.io/client-go/util/flowcontrol"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
-	"k8s.io/kubernetes/pkg/kubelet/pleg"
 	kubestatus "k8s.io/kubernetes/pkg/kubelet/status"
 	"k8s.io/kubernetes/pkg/kubelet/util/queue"
 )
@@ -47,7 +46,9 @@ const (
 	EdgeController                   = "edgecontroller"
 	enqueueDuration                  = 10 * time.Second
 	workerResyncIntervalJitterFactor = 0.5
-	syncMsgRespTimeout   = 1 * time.Minute
+	syncMsgRespTimeout               = 1 * time.Minute
+	housekeepingPeriod               = time.Second * 2
+	syncWorkQueuePeriod              = time.Second * 5
 )
 
 // podReady holds the initPodReady flag and its lock
@@ -59,25 +60,25 @@ type podReady struct {
 }
 
 type edgedLight struct {
-	enable              bool
-	hostname            string
-	namespace           string
-	nodeName            string
+	enable                    bool
+	hostname                  string
+	namespace                 string
+	nodeName                  string
 	uid                       types.UID
 	nodeStatusUpdateFrequency time.Duration
-	podManager          podmanager.Manager
-	concurrentConsumers int
-	metaClient          client.CoreInterface
-	kubeClient          clientset.Interface
-	podmanClient        podman.Interface
-	statusManager       kubestatus.Manager
-	podAdditionQueue    *workqueue.Type
-	podAdditionBackoff  *flowcontrol.Backoff
-	podDeletionQueue    *workqueue.Type
-	podDeletionBackoff  *flowcontrol.Backoff
-	workQueue           queue.WorkQueue
+	podManager                podmanager.Manager
+	concurrentConsumers       int
+	metaClient                client.CoreInterface
+	kubeClient                clientset.Interface
+	podmanClient              podman.Interface
+	statusManager             kubestatus.Manager
+	podAdditionQueue          *workqueue.Type
+	podAdditionBackoff        *flowcontrol.Backoff
+	podDeletionQueue          *workqueue.Type
+	podDeletionBackoff        *flowcontrol.Backoff
+	workQueue                 queue.WorkQueue
 	registrationCompleted     bool
-	version            string
+	version                   string
 	// podReady is structure with initPodReady flag and its lock
 	podReady
 	podLastSyncTime sync.Map
@@ -104,20 +105,20 @@ func newEdgedLight(enable bool) (*edgedLight, error) {
 	metaClient := client.New()
 	podmanClient := podman.NewClient()
 	ed := &edgedLight{
-		enable:              enable,
-		nodeName:            edgedlightconfig.Config.HostnameOverride,
-		namespace:           edgedlightconfig.Config.RegisterNodeNamespace,
-		concurrentConsumers: edgedlightconfig.Config.ConcurrentConsumers,
+		enable:                    enable,
+		nodeName:                  edgedlightconfig.Config.HostnameOverride,
+		namespace:                 edgedlightconfig.Config.RegisterNodeNamespace,
+		concurrentConsumers:       edgedlightconfig.Config.ConcurrentConsumers,
 		nodeStatusUpdateFrequency: time.Duration(edgedlightconfig.Config.NodeStatusUpdateFrequency) * time.Second,
-		podManager:          podManager,
-		podAdditionQueue:    workqueue.New(),
-		podAdditionBackoff:  backoff,
-		podDeletionQueue:    workqueue.New(),
-		podDeletionBackoff:  backoff,
-		workQueue:           queue.NewBasicWorkQueue(clock.RealClock{}),
-		metaClient:          metaClient,
-		kubeClient:          fakekube.NewSimpleClientset(metaClient),
-		podmanClient:        podmanClient,
+		podManager:                podManager,
+		podAdditionQueue:          workqueue.New(),
+		podAdditionBackoff:        backoff,
+		podDeletionQueue:          workqueue.New(),
+		podDeletionBackoff:        backoff,
+		workQueue:                 queue.NewBasicWorkQueue(clock.RealClock{}),
+		metaClient:                metaClient,
+		kubeClient:                fakekube.NewSimpleClientset(metaClient),
+		podmanClient:              podmanClient,
 		version:                   fmt.Sprintf("%s-kubeedge-%s", constants.CurrentSupportK8sVersion, version.Get()),
 		nodeIP:                    net.ParseIP(edgedlightconfig.Config.NodeIP),
 		uid:                       types.UID("38796d14-1df3-11e8-8e5a-286ed488f209"),
@@ -131,6 +132,9 @@ func (e *edgedLight) Start() {
 	e.statusManager.Start()
 	e.podAddWorkerRun(e.concurrentConsumers)
 	e.podRemoveWorkerRun(e.concurrentConsumers)
+	housekeepingTicker := time.NewTicker(housekeepingPeriod)
+	syncWorkQueueCh := time.NewTicker(syncWorkQueuePeriod)
+	go e.syncLoopIteration(housekeepingTicker.C, syncWorkQueueCh.C)
 	e.syncPod()
 }
 
@@ -233,7 +237,7 @@ func (e *edgedLight) syncPod() {
 	}
 }
 
-func (e *edgedLight) syncLoopIteration(plegCh <-chan *pleg.PodLifecycleEvent, housekeepingCh <-chan time.Time, syncWorkQueueCh <-chan time.Time) {
+func (e *edgedLight) syncLoopIteration(housekeepingCh <-chan time.Time, syncWorkQueueCh <-chan time.Time) {
 	for {
 		select {
 		case <-housekeepingCh:
@@ -253,6 +257,10 @@ func (e *edgedLight) syncLoopIteration(plegCh <-chan *pleg.PodLifecycleEvent, ho
 						Name:      pod.Name,
 					}
 					e.podAdditionQueue.Add(key.String())
+					err := e.updatePodStatus(pod)
+					if err != nil {
+						klog.Errorf("update pod status failed: %v", err)
+					}
 				}
 			}
 		}

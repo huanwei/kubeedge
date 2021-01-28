@@ -4,21 +4,22 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
+
 	"github.com/containers/podman/v2/libpod/define"
-	"github.com/ghodss/yaml"
-	"io/ioutil"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/kubelet/container"
-	"os"
-	"os/exec"
-	"strings"
 )
 
 const (
 	YamlPath = "/temp/podman_client"
 )
+
 type Interface interface {
 	CreatePod(pod *v1.Pod) error
 	DeletePod(nameOrId string) error
@@ -52,21 +53,75 @@ func NewClient() Interface {
 }
 
 func (pc *podmanClient) CreatePod(pod *v1.Pod) error {
-	//result, err := ExecCommand("podman pod create --name " + name)
-	d, err := yaml.Marshal(pod)
-	if err != nil {
-		return err
+	//result, err := ExecCommand("podman volume create ")
+	var volumeresult string
+	var podmanresult string
+	var HostPort string
+	var ContainerPort string
+	var err error
+	result, _ := ExecCommand("podman pod list | grep " + pod.Name)
+	if len(result) != 0 {
+		return nil
 	}
-	filename := fmt.Sprintf("%s/temp.yaml", YamlPath)
-	err = ioutil.WriteFile(filename, d, os.ModeTemporary)
+
+	strings.Contains()
+	containercmd := "podman container run --pod " + pod.Name + " --name " + pod.Spec.Containers[0].Name
+	podcmd := "podman pod create --name " + pod.Name
+	if pod.Spec.Volumes != nil && strings.Contains(pod.Spec.Volumes[0].Name, "default-token") {
+		klog.Info(pod.Spec.Volumes[0].Name)
+		volumeresult, err = ExecCommand("podman volume create " + pod.Spec.Volumes[0].Name)
+		if err != nil {
+			klog.Error(err)
+			return err
+		}
+		containercmd += " -v " + pod.Spec.Volumes[0].Name
+	}
+
+	//result, err := ExecCommand("podman pod create --name " + name)
+	//根据v1.pod启动podman pod，满足pod.Name与podman的podname相同即可
+
+	if pod.Spec.Containers[0].Ports != nil {
+		HostPort = strconv.Itoa(int(pod.Spec.Containers[0].Ports[0].HostPort))
+		ContainerPort = strconv.Itoa(int(pod.Spec.Containers[0].Ports[0].ContainerPort))
+		podcmd += " -p " + HostPort + ":" + ContainerPort
+	}
+	podmanresult, err = ExecCommand(podcmd)
 	if err != nil {
+		klog.Error(err)
 		return err
 	}
 
-	result, err := ExecCommand("podman play kube ./temp.yaml")
-	if strings.Contains(result, "Error") || len(result) == 0 {
-		return fmt.Errorf(result)
+	//根据v1.pod.Spec.Containers[0].Image创建容器
+	containercmd += " " + pod.Spec.Containers[0].Image
+	klog.Infof(containercmd)
+	containerresult, err := ExecCommand(containercmd)
+	if err != nil {
+		klog.Error(err)
+		return err
 	}
+	//d, err := yaml.Marshal(pod)
+	//if err != nil {
+	//	return err
+	//}
+	//filename := fmt.Sprintf("%s/temp.yaml", YamlPath)
+	//err = ioutil.WriteFile(filename, d, os.ModeTemporary)
+	//if err != nil {
+	//	return err
+	//}
+	//result, err := ExecCommand("podman play kube ./temp.yaml")
+
+	klog.Infof("successfully created!!")
+
+	if strings.Contains(volumeresult, "Error") || len(podmanresult) == 0 {
+		return fmt.Errorf(volumeresult)
+	}
+	if strings.Contains(podmanresult, "Error") || len(podmanresult) == 0 {
+		return fmt.Errorf(podmanresult)
+	}
+	if strings.Contains(containerresult, "Error") || len(containerresult) == 0 {
+		return fmt.Errorf(containerresult)
+	}
+	klog.Infof("successfully created!!")
 	return nil
 }
 
@@ -84,12 +139,12 @@ func (pc *podmanClient) DeletePod(nameOrId string) error {
 func (pc *podmanClient) GetPodStatus(uid types.UID, name, namespace string) (*container.PodStatus, error) {
 	var result string
 	var err error
-
-	if uid != "" {
-		result, err = ExecCommand(fmt.Sprintf("podman pod inspect %s --namespace %s", uid, namespace))
-	} else if name != "" {
-		result, err = ExecCommand(fmt.Sprintf("podman pod inspect %s --namespace %s", name, namespace))
-	}
+	//
+	//if uid != "" {
+	//	result, err = ExecCommand(fmt.Sprintf("podman pod inspect %s --namespace %s", uid, namespace))
+	//} else if name != "" {
+	result, err = ExecCommand(fmt.Sprintf("podman pod inspect %s ", name))
+	//}
 
 	if strings.Contains(result, "Error") {
 		return nil, fmt.Errorf("%s", result)
@@ -101,6 +156,7 @@ func (pc *podmanClient) GetPodStatus(uid types.UID, name, namespace string) (*co
 	var podmanObj define.InspectPodData
 
 	err = json.Unmarshal([]byte(result), &podmanObj)
+	klog.Infof("podmanobj : %v", podmanObj)
 	if err != nil {
 		return nil, err
 	}
@@ -109,14 +165,17 @@ func (pc *podmanClient) GetPodStatus(uid types.UID, name, namespace string) (*co
 	for _, c := range podmanObj.Containers {
 
 		var k8sStatus = &container.Status{
-			ID:           container.ContainerID{"podman", c.ID},
-			Name:         c.Name,
-			State:        pc.podmanStateToK8sState[c.State],
-			CreatedAt:    podmanObj.Created,
-
+			ID:        container.ContainerID{"podman", c.ID},
+			Name:      c.Name,
+			State:     pc.podmanStateToK8sState[c.State],
+			CreatedAt: podmanObj.Created,
 		}
 
 		ContainerStatuses = append(ContainerStatuses, k8sStatus)
+	}
+
+	for _, i := range ContainerStatuses {
+		klog.Infof("containerstatus:%s", i)
 	}
 
 	return &container.PodStatus{

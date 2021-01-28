@@ -1,6 +1,8 @@
 package edgedlight
 
 import (
+	"sort"
+
 	pkgutil "github.com/kubeedge/kubeedge/pkg/util"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,7 +13,6 @@ import (
 	"k8s.io/kubernetes/pkg/kubelet/status"
 	kubetypes "k8s.io/kubernetes/pkg/kubelet/types"
 	"k8s.io/kubernetes/pkg/kubelet/util/format"
-	"sort"
 )
 
 // 从podman获知pod是否可以删除，参考edged同名函数
@@ -367,6 +368,7 @@ func getPhase(spec *v1.PodSpec, info []v1.ContainerStatus) v1.PodPhase {
 }
 
 func (e *edgedLight) updatePodStatus(pod *v1.Pod) error {
+	klog.Infof("start pod status")
 	var podStatus *v1.PodStatus
 	var newStatus v1.PodStatus
 	var podStatusRemote *kubecontainer.PodStatus
@@ -374,6 +376,7 @@ func (e *edgedLight) updatePodStatus(pod *v1.Pod) error {
 	if e.podmanClient != nil {
 		podStatusRemote, err = e.podmanClient.GetPodStatus(pod.UID, pod.Name, pod.Namespace)
 		if err != nil {
+			klog.Errorf("%v", err)
 			containerStatus := &kubecontainer.Status{}
 			kubeStatus := toKubeContainerStatus(v1.PodUnknown, containerStatus)
 			podStatus = &v1.PodStatus{Phase: v1.PodUnknown, ContainerStatuses: []v1.ContainerStatus{kubeStatus}}
@@ -388,6 +391,7 @@ func (e *edgedLight) updatePodStatus(pod *v1.Pod) error {
 				// Assume info is ready to process
 				spec := &pod.Spec
 				allStatus := append(append([]v1.ContainerStatus{}, podStatus.ContainerStatuses...), podStatus.InitContainerStatuses...)
+				klog.Infof("allstatus : %v", allStatus)
 				podStatus.Phase = getPhase(spec, allStatus)
 				// Check for illegal phase transition
 				if pod.Status.Phase == v1.PodFailed || pod.Status.Phase == v1.PodSucceeded {
@@ -401,6 +405,7 @@ func (e *edgedLight) updatePodStatus(pod *v1.Pod) error {
 			}
 		}
 	}
+	klog.Infof("podstatus : %s", podStatus.Phase)
 	newStatus = *podStatus.DeepCopy()
 
 	//e.probeManager.UpdatePodStatus(pod.UID, &newStatus)

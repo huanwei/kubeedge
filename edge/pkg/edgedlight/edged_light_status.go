@@ -160,8 +160,7 @@ func (e *edgedLight) getNodeInfo() (v1.NodeSystemInfo, error) {
 	if err != nil {
 		return nodeInfo, err
 	}
-
-	nodeInfo.ContainerRuntimeVersion = fmt.Sprintf("use podman as container runtime")
+	nodeInfo.ContainerRuntimeVersion = fmt.Sprintf("use podman as container runtime") //todo
 
 	nodeInfo.KernelVersion = kernel
 	nodeInfo.OperatingSystem = runtime.GOOS
@@ -275,4 +274,3 @@ func (e *edgedLight) syncNodeStatus() {
 		klog.Errorf("Unable to update node status: %v", err)
 	}
 }
-

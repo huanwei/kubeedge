@@ -6,11 +6,12 @@ require (
 	github.com/256dpi/gomqtt v0.10.4
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/armon/circbuf v0.0.0-20190214190532-5111143e8da2 // indirect
-	github.com/armon/consul-api v0.0.0-20180202201655-eb2c6b5be1b6 // indirect
 	github.com/astaxie/beego v1.12.0
 	github.com/blang/semver v3.5.1+incompatible
 	github.com/cheekybits/genny v1.0.0 // indirect
 	github.com/container-storage-interface/spec v1.2.0
+	github.com/containers/common v0.29.0
+	github.com/containers/image/v5 v5.9.0
 	github.com/containers/podman/v2 v2.2.1
 	github.com/coreos/go-systemd v0.0.0-20190620071333-e64a0ec8b42a // indirect
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
@@ -28,7 +29,6 @@ require (
 	github.com/golang/protobuf v1.4.2
 	github.com/google/cadvisor v0.37.0
 	github.com/google/uuid v1.1.2
-	github.com/gopherjs/gopherjs v0.0.0-20181103185306-d547d1d9531e // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/gorilla/websocket v1.4.2
 	github.com/hashicorp/go-version v1.2.0 // indirect
@@ -42,22 +42,20 @@ require (
 	github.com/mitchellh/go-ps v0.0.0-20190716172923-621e5597135b
 	github.com/onsi/ginkgo v1.14.2
 	github.com/onsi/gomega v1.10.3
+	github.com/opentracing/opentracing-go v1.2.0
 	github.com/paypal/gatt v0.0.0-20151011220935-4ae819d591cf
 	github.com/pborman/uuid v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/sailorvii/modbus v0.1.2
 	github.com/satori/go.uuid v1.2.0
 	github.com/shirou/gopsutil v2.20.9+incompatible
-	github.com/smartystreets/assertions v0.0.0-20190116191733-b6c0e53d7304 // indirect
+	github.com/sirupsen/logrus v1.7.0
 	github.com/spf13/cobra v1.1.1
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.6.1
-	github.com/ugorji/go v1.1.4 // indirect
 	github.com/vishvananda/netlink v1.1.0
-	github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77 // indirect
 	golang.org/x/net v0.0.0-20201006153459-a7d1128ccaa0
 	google.golang.org/grpc v1.29.1
-	gopkg.in/fsnotify.v1 v1.4.7 // indirect
 	gopkg.in/yaml.v2 v2.3.0
 	k8s.io/api v0.19.3
 	k8s.io/apiextensions-apiserver v0.19.3
